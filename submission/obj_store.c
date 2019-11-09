@@ -95,13 +95,16 @@ bool store_obj(object_rep* obj_rep) {
      if (obj_rep && obj_rep->valstr) {
 	/*this would create a path for the relevant type*/
 	bool path_created = _create_ostore_dir(obj_rep->type); 
-	if (path_created) { //if the path has been created 
-		char *obj_path = _get_ofile_path(obj_rep); //get object path
-		int fd = open(obj_path, O_WRONLY); //open for writing
-		write(fd, obj_rep->valstr, OSTR_REP_MAX); //write to file descriptor
-		close(fd); //close 
-		return true; //return true
-	} 
+    
+        if (path_created) { //if the path has been created 
+            char *obj_path = _get_ofile_path(obj_rep); //get object path
+            int fd = open(obj_path, O_CREAT | O_RDWR,  0777); //open for writing
+            free(obj_path);
+            printf("value: %s \n", obj_rep->valstr);
+            write(fd, obj_rep->valstr, strlen(obj_rep->valstr)); //write to file descriptor
+            close(fd); //close 
+            return true; //return true
+        } 
 
 	}
      
