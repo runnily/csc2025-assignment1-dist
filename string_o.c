@@ -50,7 +50,7 @@ static strobj* _new_strobj(String self, const char* value) { //constant characte
     if (_object_map || (_object_map = create_map())) {
         int len = strnlen(value, STR_LEN_MAX);
     
-        char* val = strndup(value, len);
+        char* val = strndup(value, len); //uses malloc 
     
         if (val) {
             sobj = (strobj*) malloc(sizeof(strobj));
@@ -119,7 +119,7 @@ static bool _store_obj_rep(String oi, strobj* sobj) {
         
     bool r = false;
     char* valstr = NULL;    
-    (void) asprintf(&valstr, STR_REP_FMT, sobj->len, sobj->val);
+    (void) asprintf(&valstr, STR_REP_FMT, sobj->len, sobj->val); //uses malloc
     
     if (valstr) {
         object_rep obj_rep = { TYPE_STR, (uintptr_t) oi, valstr };
@@ -236,14 +236,12 @@ char _char_at(String self, int posn) {
     strobj* sobj = (strobj*) get_mentry(_object_map, self); 
     if (sobj) {
 	const char *sval= sobj->val; //get value
-	char *ref = strndup(sval , STR_LEN_MAX); //creates duplicate to maintain immutable string
 
-	if ( strncmp(ref, "", 1) == 0 ) { //if they are the same
+	if ( strncmp(sval, "", 1) == 0 ) { //
 		return 0;
 	}
-
 	if (posn>= 0 && posn<strnlen(sval,STR_LEN_MAX)) { //posn between boundary
-		return ref[posn];
+		return sval[posn];
 	}
 	
     } 
@@ -263,22 +261,19 @@ String _concat(String self, String s) {
     strobj* aobj = (strobj*) get_mentry(_object_map, s); 
     if (sobj && aobj) {
 	const char *sval= sobj->val; //get value
-	char *ref = strndup(sval , STR_LEN_MAX); //creates duplicate to retain immutable object
-
-	const char *aval= aobj->val;// get value
-	char *aref = strndup(aval , STR_LEN_MAX); 
+	const char *aval= aobj->val;// get value 
 	
 
-	char buf[STR_LEN_MAX + STR_LEN_MAX + 1]; //size combined
+	char buf[strnlen(sval,STR_LEN_MAX) +  strnlen(aval,STR_LEN_MAX)]; //size combined
 
 	//added one for to indicate NUL terminator 
 
-	strncpy(buf, ref, strnlen(ref,STR_LEN_MAX) ); //copy lhs (sval) into buffer
+	strncpy(buf, sval, strnlen(sval,STR_LEN_MAX) ); //copy lhs (sval) into buffer
 
-	buf[strnlen(ref,STR_LEN_MAX)] = '\0'; //place length here
-	strncat(buf, aref, strnlen(aref,STR_LEN_MAX)); //place aval next to sval
+	buf[strnlen(sval,STR_LEN_MAX)] = '\0'; //place length here
+	strncat(buf, aval, strnlen(aval,STR_LEN_MAX)); //place aval next to sval
 
-	buf[strnlen(ref,STR_LEN_MAX)+strnlen(aval,STR_LEN_MAX)] = '\0';
+	buf[strnlen(sval,STR_LEN_MAX)+strnlen(aval,STR_LEN_MAX)] = '\0';
 	return newString(buf);
 	}
     errno = EINVAL;
@@ -295,11 +290,9 @@ bool _equals(String self, String s) {
     strobj* aobj = (strobj*) get_mentry(_object_map, s);
     if (sobj && aobj) {
 	const char *sval= sobj->val; //get value
-	char *ref = strndup(sval , STR_LEN_MAX); //creats duplicate to retain immutable object
 
 	char *aval= aobj->val;// get value
-	char *aref = strndup(aval , STR_LEN_MAX); //creats duplicate to retain immutable object
-	if (strncmp(ref, aref, strnlen(ref,STR_LEN_MAX)+1  ) == 0) return true;
+	if (strncmp(sval, aval, strnlen(sval,STR_LEN_MAX)+1  ) == 0) return true;
     } 
     
     return false;	 
@@ -332,12 +325,12 @@ int _index_of(String self, char c, int start) {
     strobj* sobj = (strobj*) get_mentry(_object_map, self);
     if (sobj)  { //check if not null and within valid
 	const char *sval= sobj->val; //get value
-	char *ref = strndup(sval , STR_LEN_MAX); //creats duplicate to retain immunabitly
+	
 
-	if (start>=0 && start<strnlen(ref,STR_LEN_MAX) ) { //check of start
+	if (start>=0 && start<strnlen(sval,STR_LEN_MAX) ) { //check of start
 
-		for (int i = start; i<strnlen(ref,STR_LEN_MAX); i++) { //loop from start position
-			if (c == ref[i]) { //if char is equal return I
+		for (int i = start; i<strnlen(sval,STR_LEN_MAX); i++) { //loop from start position
+			if (c == sval[i]) { //if char is equal return I
 				return i;
 
 			}
@@ -373,9 +366,8 @@ String* _split(String self, String delim) {
 	char *ref = strndup(sval , STR_LEN_MAX); //duplicate so value would not change
 	const char *dval=  dobj->val; //get value of delimiter
 	
-
        	
-	String *entries = (String*) malloc(STR_LEN_MAX * sizeof(String)); //
+	String *entries = (String*) calloc(strnlen(ref, STR_LEN_MAX)+2, sizeof(String)); //Assigns the max amount of string
 
         /*....FAILED ALLOCATION...*/
 	if (entries == NULL) { 
@@ -393,9 +385,8 @@ String* _split(String self, String delim) {
 	}
 	
 
-	
+	free(ref);
 	return entries;
-	free(entries);
 
      }
      errno = EINVAL; 
@@ -412,8 +403,8 @@ String _substring(String self, int start, int length) {
     strobj* sobj = (strobj*) get_mentry(_object_map, self);
     if (sobj) {
 	const char *sval=  sobj->val; //get val of string
-	char *ref = strndup(sval , STR_LEN_MAX); //duplicate so value would not change
-	int lenRef = strnlen(ref, STR_LEN_MAX);
+
+	int lenRef = strnlen(sval, STR_LEN_MAX);
 	if ( (start >= 0 && start <= lenRef) && (length>= 0 &&  length<=lenRef-start) ) {
 		
 		char buf[STR_LEN_MAX]; //creates buffer
@@ -425,7 +416,7 @@ String _substring(String self, int start, int length) {
 		}
 
 		for (int i = 0; i<length; i++) { //creates substring
-			buf[i] = ref[i+start];
+			buf[i] = sval[i+start];
 		
 		} 
 		
